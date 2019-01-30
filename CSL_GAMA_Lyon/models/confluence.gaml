@@ -15,7 +15,7 @@ global{
 	
 	float step <- 2 #mn;
 	
-	int nb_car <- 1000;
+	int nb_people <- 1000;
 	int current_hour update: (time / #hour) mod 24;
 	
 	int min_work_start <- 6;
@@ -32,8 +32,11 @@ global{
 
 	init{
 		create building from: shape_file_buildings with: [type::string(read ("Type"))]{
-			if type="commerce" or  type="Musee"{
+			if type="commerce"{
 				color <- #steelblue;
+			}
+			if type="gare" or  type="Musee"{
+				color <- #goldenrod;
 			}
 			if type="habitat" {
 				color <- #white;
@@ -47,7 +50,7 @@ global{
 		list<building> residential_buildings <- building where (each.type="habitat");
       	list<building>  industrial_buildings <- building  where (each.type="commerce" or each.type="Musee") ;
 		
-		create car number: nb_car{
+		create people number: nb_people{
 			speed <- min_speed + rnd (max_speed - min_speed) ;
       		start_work <- min_work_start + rnd (max_work_start - min_work_start) ;
           	end_work <- min_work_end + rnd (max_work_end - min_work_end) ;
@@ -91,7 +94,7 @@ species road {
 	}
 }
 
-species car skills: [moving]{
+species people skills: [moving]{
 	//rgb color <- #goldenrod;
 	rgb color <- #red;
 	building living_place <- nil;
@@ -159,30 +162,31 @@ grid gridHeatmaps height: 50 width: 50 {
 	*/
 }
 
-experiment road_traffic type: gui{
+experiment life type: gui{
 	parameter "Shapefile for the buildings" var: shape_file_buildings category: "GIS";
 	parameter "Shapefile for the roads" var: shape_file_roads category: "GIS";
 
-	parameter "Number of car agents" var: nb_car category: "Car";
+	parameter "Number of people agents" var: nb_people category: "People";
 	
-	parameter "Earliest hour to start work" var: min_work_start category: "Car" min: 2 max: 8;
-	parameter "Latest hour to start work" var: max_work_start category: "Car" min: 8 max: 12;
-	parameter "Earliest hour to end work" var: min_work_end category: "Car" min: 12 max: 16;
-	parameter "Latest hour to end work" var: max_work_end category: "Car" min: 16 max: 23;
-	parameter "Minimal speed" var: min_speed category: "Car" min: 0.1 #km/#h ;
-	parameter "Maximal speed" var: max_speed category: "Car" max: 50 #km/#h;
+	parameter "Earliest hour to start work" var: min_work_start category: "People" min: 2 max: 8;
+	parameter "Latest hour to start work" var: max_work_start category: "People" min: 8 max: 12;
+	parameter "Earliest hour to end work" var: min_work_end category: "People" min: 12 max: 16;
+	parameter "Latest hour to end work" var: max_work_end category: "People" min: 16 max: 23;
+	parameter "Minimal speed" var: min_speed category: "People" min: 0.1 #km/#h ;
+	parameter "Maximal speed" var: max_speed category: "People" max: 50 #km/#h;
 	
 	parameter "Value of destruction when a people agent takes a road" var: destroy category: "Road" ;
 	parameter "Number of steps between two road repairs" var: repair_time category: "Road" ;
 	
 	output{
-		display city_display type: opengl background:#black refresh: every(1#s){
+		display city_display type: opengl background:#black { //refresh: every(1#s)
 			species building aspect: base;
 			species road aspect: base;
-			species car aspect: base;
+			species people aspect: base;
 			//species gridHeatmaps aspect:pollution;
 		}
 		
+		/** 
 		display chart_display { //every(10 #cycle)
 			chart "Road Status" type: series size: {1, 0.5} position: {0, 0}{
 				data "Mean road destruction" value: mean (road collect each.destruction_coeff) style: line color: #green;
@@ -190,9 +194,10 @@ experiment road_traffic type: gui{
 			}
 			
 			chart "People Objectif" type: pie style: exploded size: {1, 0.5} position: {0, 0.5} {
-				data "Working" value: car count (each.objective = "working") color: #magenta;
-				data "Resting" value: car count (each.objective = "resting") color: #blue;
+				data "Working" value: people count (each.objective = "working") color: #magenta;
+				data "Resting" value: people count (each.objective = "resting") color: #blue;
 			}
 		}
+		* */
 	}
 }
