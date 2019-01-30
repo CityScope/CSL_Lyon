@@ -13,18 +13,17 @@ global{
 	file shape_file_roads <- file("../includes/ROUTESCC46.shp");
 	geometry shape <- envelope(shape_file_buildings);
 	
-	float step_max <- 3 #mn;
-	float step_min <- 30 #ms;
+	float step_max <- 5 #mn;
+	float step_min <- 300 #ms;
 	float step <- step_min;
 	
-	int nb_people <- 1000;
+	int nb_people <- 500;
 	float current_hour <- 0.0;
 	int min_work_start <- 7;
 	int max_work_start <- 8;
 	int min_work_end <- 17; 
 	int max_work_end <- 18; 
-	float min_speed <- 500.0 #km / #h;
-	float max_speed <- 800.0 #km / #h; 
+	float ref_speed <- 200.0 #km / #h;
 	graph the_graph;
 	
 	float destroy <- 0.02;
@@ -52,7 +51,7 @@ global{
       	list<building>  interesting_buildings <- building  where (each.type="commerce" or each.type="Musee" or each.type="gare") ;
 		
 		create people number: nb_people{
-			speed <- min_speed + rnd (max_speed - min_speed) ;
+			speed <- ref_speed;
       		start_work <- min_work_start + (max_work_start - min_work_start) * rnd(0,100)/100.0;
           	end_work <- min_work_end + (max_work_end - min_work_end) * rnd(0,100)/100.0 ;
           	living_place <- one_of(residential_buildings) ;
@@ -161,11 +160,10 @@ species people skills: [moving]{
 				the_target <- nil;
 			}
 		}
-		
-		if(working_place.type = "Musee" or working_place.type = "gare")
-		{
-			do wander speed: 10.0 bounds: circle(10);
-		}
+	}
+	
+	reflex update_speed{
+		speed <- ref_speed;
 	}
 
 	
@@ -191,7 +189,8 @@ grid gridHeatmaps height: 50 width: 50 {
 	*/
 }
 
-experiment life type: gui{
+experiment life type: gui {
+	float minimum_cycle_duration <- 1/30;
 	parameter "Shapefile for the buildings" var: shape_file_buildings category: "GIS";
 	parameter "Shapefile for the roads" var: shape_file_roads category: "GIS";
 
@@ -201,14 +200,13 @@ experiment life type: gui{
 	parameter "Latest hour to start work" var: max_work_start category: "People" min: 8 max: 12;
 	parameter "Earliest hour to end work" var: min_work_end category: "People" min: 12 max: 16;
 	parameter "Latest hour to end work" var: max_work_end category: "People" min: 16 max: 23;
-	parameter "Minimal speed" var: min_speed category: "People" min: 0.1 #km/#h ;
-	parameter "Maximal speed" var: max_speed category: "People" max: 1000 #km/#h;
+	parameter "Car speed" var: ref_speed category: "People" min: 5 #km/#h max: 1000 #km/#h;
 	
 	parameter "Value of destruction when a people agent takes a road" var: destroy category: "Road" ;
 	parameter "Number of steps between two road repairs" var: repair_time category: "Road" ;
 	
 	output{
-		display city_display type: opengl background:#black { //
+		display city_display type: opengl background:#black synchronized:true { //
 			species building aspect: base refresh: false;
 			species road aspect: base refresh: false;
 			species people aspect: base;
