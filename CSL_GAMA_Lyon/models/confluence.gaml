@@ -14,19 +14,19 @@ global{
 	file shape_file_roads <- file("../includes/ROUTESCC46.shp");
 	geometry shape <- envelope(shape_file_buildings);
 	
-	float step_max <- 40 #mn;
-	float step_min <- 8 #s;
+	float step_max <- 6 #mn;
+	float step_min <- 6 #s; // 10sec of disp == 1h of sim (at 60 fps)
 	
 	float step <- step_min;
 	
-	int nb_people <- 800;
+	int nb_people <- 500;
 	float current_hour <- 0.0;
-	int min_work_start <- 8;
-	int max_work_start <- 12;
+	int min_work_start <- 6;
+	int max_work_start <- 8;
 	int min_work_end <- 16; 
 	int max_work_end <- 18; 
 	
-	float ref_speed <- 2.0 #km / #h;
+	float ref_speed <- 8.0 #km / #h;
 	graph the_graph;
 	
 	float destroy <- 0.02;
@@ -68,8 +68,8 @@ global{
 	
 	reflex update_step{
 		bool time_to_stay <- (current_hour < min_work_start 
-			or ((current_hour > max_work_start + 2) and (current_hour < min_work_end - 2))
-			or current_hour > max_work_start );
+			or ((current_hour > max_work_start + 1) and (current_hour < min_work_end))
+			or current_hour > max_work_start + 1);
 		if(time_to_stay)
 		{
 			step <- step_max;
@@ -131,7 +131,7 @@ species people skills: [moving]{
 	point the_target <- nil;
 	
 	aspect base{
-		draw circle(8) color: color;
+		draw circle(10) color: color;
 	}
 	
 	reflex time_to_work when: current_hour > start_work and current_hour < start_work + 1 and objective = "resting"{
@@ -148,23 +148,7 @@ species people skills: [moving]{
 		do updatePollutionMap;
 		
 		path path_followed <- self goto [target::the_target, on::the_graph, return_path:: true];
-		list<geometry> segments <- path_followed.segments;
-		loop line over: segments{
-			float dist <- line.perimeter;
-			ask road(path_followed agent_from_geometry line){
-				destruction_coeff <- destruction_coeff + (destroy * dist/ shape.perimeter);
-			}
-		}
 		
-		
-		if the_target = location{
-			the_target <- nil;
-		} else {
-			
-			
-		}
-		
-		do goto target: the_target on: the_graph;
 		if the_target = location{
 			the_target <- nil;
 		}
@@ -178,19 +162,19 @@ species people skills: [moving]{
 	action updatePollutionMap{
 		if(current_path != nil)
 		{
-			list<gridHeatmaps> tmp <- gridHeatmaps overlapping(current_path.shape);
+			list<gridHeatmaps> tmp <- gridHeatmaps overlapping(shape);
 		
 			if(tmp != nil and tmp != []){
 				
 				ask tmp {
-					pollution_level <- pollution_level + 10;
+					pollution_level <- pollution_level + 1;
 				}
 			}	
 		}
 	}
 }
 
-grid gridHeatmaps height: 50 width: 50 {
+grid gridHeatmaps height: 100 width: 100 {
 	int pollution_level <- 0 ;
 	rgb pollution_color <- rgb(255-pollution_level*10,255-pollution_level*10,255-pollution_level*10) update:rgb(255-pollution_level*10,255-pollution_level*10,255-pollution_level*10);
 	
@@ -220,7 +204,7 @@ grid cell width: 100 height: 50 {
  */
 
 experiment life type: gui {
-	float minimum_cycle_duration <- 1/30;
+	float minimum_cycle_duration <- 1/60; //60fps
 	
 	parameter "Car speed" var: ref_speed category: "Runtime settings" min: 5 #km/#h max: 1000 #km/#h;
 	parameter "Step working/resting hour" var: step_max category: "Runtime settings" min: 1#mn max: 20#mn;
