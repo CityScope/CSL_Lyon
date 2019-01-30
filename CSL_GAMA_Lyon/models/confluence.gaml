@@ -9,7 +9,7 @@ model confluence
 
 /* Insert your model definition here */
 global{
-	//list<list<float>> heat_map <- [[30,146,254],[86,149,242],[144,201,254],[180,231,252],[223,255,216],[254,255,113],[248,209,69],[243,129,40],[235,46,26],[109,23,8]];
+	
 	file shape_file_buildings <- file("../includes/Bati_reclass_CC46.shp");
 	file shape_file_roads <- file("../includes/ROUTESCC46.shp");
 	geometry shape <- envelope(shape_file_buildings);
@@ -18,15 +18,17 @@ global{
 	float step_min <- 6 #s; // 10sec of disp == 1h of sim (at 60 fps)
 	
 	float step <- step_min;
+	bool heatmap <- true;
 	
-	int nb_people <- 500;
+	list<list<float>> heatmap_color <- [[30,146,254],[86,149,242],[144,201,254],[180,231,252],[223,255,216],[254,255,113],[248,209,69],[243,129,40],[235,46,26],[109,23,8]];
+	int nb_people <- 600;
 	float current_hour <- 0.0;
 	int min_work_start <- 6;
 	int max_work_start <- 8;
 	int min_work_end <- 16; 
 	int max_work_end <- 18; 
 	
-	float ref_speed <- 8.0 #km / #h;
+	float ref_speed <- 10.0 #km / #h;
 	graph the_graph;
 	
 	float destroy <- 0.02;
@@ -47,8 +49,18 @@ global{
 			}
 		}
 
-		create road from: shape_file_roads;
-		map<road,float> weights_map <- road as_map (each:: (each.destruction_coeff * each.shape.perimeter));
+		create road from: shape_file_roads with: [classe::string(read("CLASSE"))]{
+			if classe="Route"{
+				weight <- 1.0;
+			}
+			if classe="Départementale"{
+				weight <- 0.6;
+			}
+			if classe="Autoroute"{
+				weight <- 0.2;
+			}
+		}
+		map<road,float> weights_map <- road as_map (each:: (each.weight * each.shape.perimeter));
       	the_graph <- as_edge_graph(road) with_weights weights_map;
 		
 		list<building> residential_buildings <- building where (each.type="habitat");
@@ -86,17 +98,6 @@ global{
 		}	
 	}
 	
-	reflex update_graph{
-		map<road, float> weights_map <- road as_map (each:: (each.destruction_coeff * each.shape.perimeter));
-		the_graph <- the_graph with_weights weights_map;
-	}
-	
-	reflex repair_road when: every(repair_time #hour / step){
-		road the_road_to_repair <- road with_max_of(each.destruction_coeff);
-		ask the_road_to_repair{
-			destruction_coeff <- 1.0;
-		}
-	}
 }
 
 species building{
@@ -110,9 +111,9 @@ species building{
 }
 
 species road {
-	float destruction_coeff <- 1.0;
-	int colorValue <- int(255*(destruction_coeff - 1)) update: int (255 * (destruction_coeff - 1));
-	rgb color <- rgb(min([255, colorValue]), max ([0,255 - colorValue]), 0) update: rgb(min([255, colorValue]), max ([0,255 - colorValue]), 0);
+	string classe;
+	float weight <- 1.0;
+	rgb color <- rgb(0, 255, 0);
 	
 	aspect base {
 		draw shape color: color;
@@ -162,10 +163,9 @@ species people skills: [moving]{
 	action updatePollutionMap{
 		if(current_path != nil)
 		{
-			list<gridHeatmaps> tmp <- gridHeatmaps overlapping(shape);
+			list<cell> tmp <- cell overlapping(shape);
 		
-			if(tmp != nil and tmp != []){
-				
+			if(tmp != []){
 				ask tmp {
 					pollution_level <- pollution_level + 1;
 				}
@@ -174,12 +174,26 @@ species people skills: [moving]{
 	}
 }
 
-grid gridHeatmaps height: 100 width: 100 {
+grid cell height: 100 width: 100 neighbors: 8{
 	int pollution_level <- 0 ;
-	rgb pollution_color <- rgb(255-pollution_level*10,255-pollution_level*10,255-pollution_level*10) update:rgb(255-pollution_level*10,255-pollution_level*10,255-pollution_level*10);
+	list neighbours of: cell <- (self neighbors_at 1) of_species cell;  
+	
+	rgb pollution_color <- rgb(255-pollution_level*10,255-pollution_level*10,255-pollution_level*10) update:rgb(255-pollution_level*10,255-pollution_level*10,255-pollution_level*10); 
+	
+	/* 
+	reflex update_color when:heatmap{
+		float level2 <-(min([1,max([0,pollution_level/25])]))^(0.5);
+		float tmp <- level2*(length(heatmap_color)-1);
+		color <- rgb(heatmap_color[int(tmp)]);
+	}
+	* 
+	*/
 	
 	aspect pollution{
-		draw shape color:pollution_color;
+		if(heatmap)
+		{
+			draw shape color:pollution_color;
+		}
 	}
 }
 
@@ -228,9 +242,10 @@ experiment life type: gui {
 		display city_display type: opengl background:rgb(cycle mod 256, cycle mod 256, cycle mod 256) synchronized:true 
 			camera_pos: {1473.4207,1609.8385,2114.0265} camera_look_pos: {1409.429,1572.8928,-0.883} camera_up_vector: {-0.8655,0.4997,0.0349}
 		{
-			species gridHeatmaps aspect:pollution;
 			species building aspect: base refresh: false;
 			species road aspect: base refresh: false;
+			species cell aspect:pollution;
+			
 			species people aspect: base;
 			//species cell transparency: 0.5;// lines: #white 
 			
