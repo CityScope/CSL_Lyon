@@ -19,10 +19,13 @@ global{
 	
 	float step <- step_min;
 	bool heatmap <- true;
+	bool heatmap_clean <- false;
 	
 	list<list<float>> heatmap_color <- [[30,146,254],[86,149,242],[144,201,254],[180,231,252],[223,255,216],[254,255,113],[248,209,69],[243,129,40],[235,46,26],[109,23,8]];
 	int nb_people <- 600;
+	
 	float current_hour <- 0.0;
+	
 	int min_work_start <- 6;
 	int max_work_start <- 8;
 	int min_work_end <- 16; 
@@ -31,8 +34,7 @@ global{
 	float ref_speed <- 10.0 #km / #h;
 	graph the_graph;
 	
-	float destroy <- 0.02;
-	int repair_time <- 2;
+	int pollution_max_level <- 25;
 	
 
 	init{
@@ -74,28 +76,22 @@ global{
           	working_place <- one_of(interesting_buildings) ;
           	objective <- "resting";
           	location <- any_location_in (living_place);
-		}
-		
+		}		
 	}
 	
 	reflex update_step{
-		bool time_to_stay <- (current_hour < min_work_start 
-			or ((current_hour > max_work_start + 1) and (current_hour < min_work_end))
-			or current_hour > max_work_start + 1);
-		if(time_to_stay)
+		bool time_to_go <- ((current_hour >= min_work_start) and (current_hour <= max_work_start + 1));
+		bool time_to_come_back <- ((current_hour >= min_work_end) and (current_hour <= max_work_start + 1));
+		if(time_to_go or time_to_come_back)
 		{
-			step <- step_max;
-		}else {
 			step <- step_min;
+		}else {
+			step <- step_max;
 		}
 	}
 	
 	reflex update_current_hour{
-		current_hour <- time / #hour;
-		if(current_hour > 24)
-		{
-			current_hour <- 0.0;
-		}	
+		current_hour <- current_date.hour + float(current_date.minute/60.0);	
 	}
 	
 }
@@ -167,7 +163,11 @@ species people skills: [moving]{
 		
 			if(tmp != []){
 				ask tmp {
-					pollution_level <- pollution_level + 1;
+					pollution_level <- pollution_level +1;
+					if(pollution_level > pollution_max_level)
+					{
+						pollution_level <- pollution_max_level;
+					}
 				}
 			}	
 		}
@@ -175,19 +175,26 @@ species people skills: [moving]{
 }
 
 grid cell height: 100 width: 100 neighbors: 8{
+	
 	int pollution_level <- 0 ;
 	list neighbours of: cell <- (self neighbors_at 1) of_species cell;  
-	
-	rgb pollution_color <- rgb(255-pollution_level*10,255-pollution_level*10,255-pollution_level*10) update:rgb(255-pollution_level*10,255-pollution_level*10,255-pollution_level*10); 
-	
-	/* 
+
+	rgb pollution_color <- rgb(255,255,255);
+	float transparency <- 1.0;
+
 	reflex update_color when:heatmap{
 		float level2 <-(min([1,max([0,pollution_level/25])]))^(0.5);
 		float tmp <- level2*(length(heatmap_color)-1);
-		color <- rgb(heatmap_color[int(tmp)]);
+		pollution_color <- rgb(heatmap_color[int(tmp)]);
 	}
-	* 
-	*/
+	
+	reflex update_transparency when:heatmap {
+		transparency <- 1.0 - float(pollution_level) / pollution_max_level;
+	}
+	
+	action raz {
+		pollution_level <- 0;
+	}
 	
 	aspect pollution{
 		if(heatmap)
@@ -197,26 +204,6 @@ grid cell height: 100 width: 100 neighbors: 8{
 	}
 }
 
-/*
-grid cell width: 100 height: 50 {
-	float level <- 0.0;
-	list neighbours of: cell <- (self neighbors_at 1) of_species cell;  
-	rgb color <- rgb(rnd(255),rnd(255),rnd(255));   
-	
-	reflex update_color when:heatmap{
-		float level2 <-(min([1,max([0,level/25])]))^(0.5);
-		float tmp <- level2*(length(heat_map)-1);
-		color <- rgb(heat_map[int(tmp)]);
-	}
-	
-	aspect default{
-		if(heatmap){
-		  draw shape color:color;	
-		}
-	}
-}
- */
-
 experiment life type: gui {
 	float minimum_cycle_duration <- 1/60; //60fps
 	
@@ -224,31 +211,28 @@ experiment life type: gui {
 	parameter "Step working/resting hour" var: step_max category: "Runtime settings" min: 1#mn max: 20#mn;
 	parameter "Step moving hour" var: step_min category: "Runtime settings";
 	
-	parameter "Shapefile for the buildings" var: shape_file_buildings category: "GIS";
-	parameter "Shapefile for the roads" var: shape_file_roads category: "GIS";
-
 	parameter "Number of people agents" var: nb_people category: "People";
 	
-	parameter "Earliest hour to start work" var: min_work_start category: "People" min: 2 max: 8;
-	parameter "Latest hour to start work" var: max_work_start category: "People" min: 8 max: 12;
-	parameter "Earliest hour to end work" var: min_work_end category: "People" min: 12 max: 16;
-	parameter "Latest hour to end work" var: max_work_end category: "People" min: 16 max: 23;
-	
-	
-	parameter "Value of destruction when a people agent takes a road" var: destroy category: "Road" ;
-	parameter "Number of steps between two road repairs" var: repair_time category: "Road" ;
+	parameter "Shapefile for the buildings" var: shape_file_buildings category: "GIS";
+	parameter "Shapefile for the roads" var: shape_file_roads category: "GIS";
 	
 	output{
-		display city_display type: opengl background:rgb(cycle mod 256, cycle mod 256, cycle mod 256) synchronized:true 
-			camera_pos: {1473.4207,1609.8385,2114.0265} camera_look_pos: {1409.429,1572.8928,-0.883} camera_up_vector: {-0.8655,0.4997,0.0349}
+		display city_display type: opengl 
+		background:rgb(sin_rad(#pi * current_hour / 24.0) * 150, sin_rad(#pi * current_hour / 24.0) * 120, sin_rad(#pi * current_hour / 24.0) * 80) 
+		synchronized:true 
+		camera_pos: {1473.4207,1609.8385,2114.0265} camera_look_pos: {1409.429,1572.8928,-0.883} camera_up_vector: {-0.8655,0.4997,0.0349}
 		{
 			species building aspect: base refresh: false;
 			species road aspect: base refresh: false;
-			species cell aspect:pollution;
-			
+			species cell aspect:pollution transparency: 0.75;
 			species people aspect: base;
-			//species cell transparency: 0.5;// lines: #white 
 			
+			graphics "time" {
+				draw string(current_date.hour) + "h" + string(current_date.minute) +"m" color: # white font: font("Helvetica", 30, #italic) at: {world.shape.width*0.43,world.shape.height*0.93};
+			}
+			
+			event ['h'] action: {heatmap <- !heatmap;}; //heatmap display
+			event ['c'] action: {if(heatmap){ask cell{do raz;}}}; // clean heatmap (if heatmap)
 		}
 	}
 }
