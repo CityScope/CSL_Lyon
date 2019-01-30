@@ -9,21 +9,24 @@ model confluence
 
 /* Insert your model definition here */
 global{
+	//list<list<float>> heat_map <- [[30,146,254],[86,149,242],[144,201,254],[180,231,252],[223,255,216],[254,255,113],[248,209,69],[243,129,40],[235,46,26],[109,23,8]];
 	file shape_file_buildings <- file("../includes/Bati_reclass_CC46.shp");
 	file shape_file_roads <- file("../includes/ROUTESCC46.shp");
 	geometry shape <- envelope(shape_file_buildings);
 	
-	float step_max <- 5 #mn;
-	float step_min <- 300 #ms;
+	float step_max <- 40 #mn;
+	float step_min <- 8 #s;
+	
 	float step <- step_min;
 	
-	int nb_people <- 500;
+	int nb_people <- 800;
 	float current_hour <- 0.0;
-	int min_work_start <- 7;
-	int max_work_start <- 8;
-	int min_work_end <- 17; 
+	int min_work_start <- 8;
+	int max_work_start <- 12;
+	int min_work_end <- 16; 
 	int max_work_end <- 18; 
-	float ref_speed <- 200.0 #km / #h;
+	
+	float ref_speed <- 2.0 #km / #h;
 	graph the_graph;
 	
 	float destroy <- 0.02;
@@ -39,7 +42,8 @@ global{
 				color <- #goldenrod;
 			}
 			if type="habitat" {
-				color <- #white;
+				//color <- #white;
+				color <- #grey;
 			}
 		}
 
@@ -64,7 +68,7 @@ global{
 	
 	reflex update_step{
 		bool time_to_stay <- (current_hour < min_work_start 
-			or ((current_hour > max_work_start) and (current_hour < min_work_end))
+			or ((current_hour > max_work_start + 2) and (current_hour < min_work_end - 2))
 			or current_hour > max_work_start );
 		if(time_to_stay)
 		{
@@ -76,6 +80,10 @@ global{
 	
 	reflex update_current_hour{
 		current_hour <- time / #hour;
+		if(current_hour > 24)
+		{
+			current_hour <- 0.0;
+		}	
 	}
 	
 	reflex update_graph{
@@ -93,7 +101,8 @@ global{
 
 species building{
 	string type;
-	rgb color <- #grey;
+	//rgb color <- #grey;
+	rgb color <- #black;
 	
 	aspect base {
 		draw shape color: color;
@@ -136,29 +145,28 @@ species people skills: [moving]{
 	}
 	
 	reflex move when: the_target != nil{
-		if(the_target != nil){
-			path path_followed <- self goto [target::the_target, on::the_graph, return_path:: true];
-			/* 
-			list<geometry> segments <- path_followed.segments;
-			loop line over: segments{
-				float dist <- line.perimeter;
-				ask road(path_followed agent_from_geometry line){
-					destruction_coeff <- destruction_coeff + (destroy * dist/ shape.perimeter);
-				}
+		do updatePollutionMap;
+		
+		path path_followed <- self goto [target::the_target, on::the_graph, return_path:: true];
+		list<geometry> segments <- path_followed.segments;
+		loop line over: segments{
+			float dist <- line.perimeter;
+			ask road(path_followed agent_from_geometry line){
+				destruction_coeff <- destruction_coeff + (destroy * dist/ shape.perimeter);
 			}
-			* */
+		}
+		
+		
+		if the_target = location{
+			the_target <- nil;
+		} else {
 			
-			if the_target = location{
-				the_target <- nil;
-			} else {
-				//do updatePollutionMap;
-				
-			}
 			
-			do goto target: the_target on: the_graph;
-			if the_target = location{
-				the_target <- nil;
-			}
+		}
+		
+		do goto target: the_target on: the_graph;
+		if the_target = location{
+			the_target <- nil;
 		}
 	}
 	
@@ -168,10 +176,18 @@ species people skills: [moving]{
 
 	
 	action updatePollutionMap{
-		ask gridHeatmaps overlapping(current_path.shape) {
-			pollution_level <- pollution_level + 1;
+		if(current_path != nil)
+		{
+			list<gridHeatmaps> tmp <- gridHeatmaps overlapping(current_path.shape);
+		
+			if(tmp != nil and tmp != []){
+				
+				ask tmp {
+					pollution_level <- pollution_level + 10;
+				}
+			}	
 		}
-	}	
+	}
 }
 
 grid gridHeatmaps height: 50 width: 50 {
@@ -181,16 +197,35 @@ grid gridHeatmaps height: 50 width: 50 {
 	aspect pollution{
 		draw shape color:pollution_color;
 	}
-	/** 	
-	reflex raz when: every(24#hour) {
-		pollution_level <- 0;
-	}
-	* 
-	*/
 }
+
+/*
+grid cell width: 100 height: 50 {
+	float level <- 0.0;
+	list neighbours of: cell <- (self neighbors_at 1) of_species cell;  
+	rgb color <- rgb(rnd(255),rnd(255),rnd(255));   
+	
+	reflex update_color when:heatmap{
+		float level2 <-(min([1,max([0,level/25])]))^(0.5);
+		float tmp <- level2*(length(heat_map)-1);
+		color <- rgb(heat_map[int(tmp)]);
+	}
+	
+	aspect default{
+		if(heatmap){
+		  draw shape color:color;	
+		}
+	}
+}
+ */
 
 experiment life type: gui {
 	float minimum_cycle_duration <- 1/30;
+	
+	parameter "Car speed" var: ref_speed category: "Runtime settings" min: 5 #km/#h max: 1000 #km/#h;
+	parameter "Step working/resting hour" var: step_max category: "Runtime settings" min: 1#mn max: 20#mn;
+	parameter "Step moving hour" var: step_min category: "Runtime settings";
+	
 	parameter "Shapefile for the buildings" var: shape_file_buildings category: "GIS";
 	parameter "Shapefile for the roads" var: shape_file_roads category: "GIS";
 
@@ -200,31 +235,21 @@ experiment life type: gui {
 	parameter "Latest hour to start work" var: max_work_start category: "People" min: 8 max: 12;
 	parameter "Earliest hour to end work" var: min_work_end category: "People" min: 12 max: 16;
 	parameter "Latest hour to end work" var: max_work_end category: "People" min: 16 max: 23;
-	parameter "Car speed" var: ref_speed category: "People" min: 5 #km/#h max: 1000 #km/#h;
+	
 	
 	parameter "Value of destruction when a people agent takes a road" var: destroy category: "Road" ;
 	parameter "Number of steps between two road repairs" var: repair_time category: "Road" ;
 	
 	output{
-		display city_display type: opengl background:#black synchronized:true { //
+		display city_display type: opengl background:rgb(cycle mod 256, cycle mod 256, cycle mod 256) synchronized:true 
+			camera_pos: {1473.4207,1609.8385,2114.0265} camera_look_pos: {1409.429,1572.8928,-0.883} camera_up_vector: {-0.8655,0.4997,0.0349}
+		{
+			species gridHeatmaps aspect:pollution;
 			species building aspect: base refresh: false;
 			species road aspect: base refresh: false;
 			species people aspect: base;
-			//species gridHeatmaps aspect:pollution;
-		}
-		
-		/** 
-		display chart_display { //every(10 #cycle)
-			chart "Road Status" type: series size: {1, 0.5} position: {0, 0}{
-				data "Mean road destruction" value: mean (road collect each.destruction_coeff) style: line color: #green;
-				data "Max road destruction" value: road max_of each.destruction_coeff color: #red;
-			}
+			//species cell transparency: 0.5;// lines: #white 
 			
-			chart "People Objectif" type: pie style: exploded size: {1, 0.5} position: {0, 0.5} {
-				data "Working" value: people count (each.objective = "working") color: #magenta;
-				data "Resting" value: people count (each.objective = "resting") color: #blue;
-			}
 		}
-		* */
 	}
 }
