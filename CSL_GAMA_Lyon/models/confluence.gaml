@@ -101,11 +101,12 @@ global{
           	location <- any_location_in (living_place);
 		}		
 		
-		
+		/* 
 		create extra_people_highway number: nb_extra_people{
 			spawns <- building  where (each.type="spawn1" or each.type="spawn2");
 			location <- any_location_in (one_of(spawns));
 		}
+		*/
 		
 		/* TODO
 		create train number: nb_train{
@@ -117,8 +118,8 @@ global{
 	}
 	
 	reflex update_step{
-		bool time_to_go <- ((current_hour >= min_work_start) and (current_hour <= max_work_start + 1));
-		bool time_to_come_back <- ((current_hour >= min_work_end) and (current_hour <= max_work_start + 1));
+		bool time_to_go <- ((current_date.hour >= min_work_start) and (current_date.hour <= max_work_start + 1));
+		bool time_to_come_back <- ((current_date.hour >= min_work_end) and (current_date.hour <= max_work_start + 1));
 		if(time_to_go or time_to_come_back)
 		{
 			step <- step_min;
@@ -194,7 +195,7 @@ species people skills: [moving]{
 	
 	aspect base{
 		if(showAgent){
-		 draw circle(10) color: color;
+		 draw circle(4) color: color;
 		}
 	}
 	
@@ -279,7 +280,7 @@ species extra_people_highway skills: [moving]{
 	
 	aspect base{
 		if(the_target != nil ){
-			draw circle(10) color: color;
+			draw circle(4) color: color;
 		}
 	}
 }
