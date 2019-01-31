@@ -326,7 +326,11 @@ grid cell height: 100 width: 100 neighbors: 4 {
 	}
 	
 	reflex update_transparency when:heatmap {
-		transparency <- float(pollution_level) / pollution_max_level;
+		if(current_date.hour > 22){
+			do raz;
+		} else {
+			transparency <- float(pollution_level) / pollution_max_level;
+		}
 	}
 	
 	//TODO not working
