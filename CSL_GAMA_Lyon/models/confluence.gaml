@@ -12,6 +12,7 @@ global{
 	
 	file shape_file_buildings <- file("../includes/Bati_reclass_CC46.shp");
 	file shape_file_roads <- file("../includes/ROUTESCC46.shp");
+	file shape_file_trains <- file("../includes/voiesferres_ligneunique_CC46.shp");
 	geometry shape <- envelope(shape_file_buildings);
 	
 	float step_max <- 6 #mn;
@@ -20,9 +21,14 @@ global{
 	float step <- step_min;
 	bool heatmap <- true;
 	bool heatmap_clean <- false;
+	bool road_display <- true;
+	bool building_display <- true;
+	bool add_bridges_flag <- false;
+	bool ns_wind <- false;
 	
-	list<list<float>> heatmap_color <- [[30,146,254],[86,149,242],[144,201,254],[180,231,252],[223,255,216],[254,255,113],[248,209,69],[243,129,40],[235,46,26],[109,23,8]];
 	int nb_people <- 600;
+	int nb_extra_people <- 20;
+	int nb_train <- 5;
 	
 	float current_hour <- 0.0;
 	
@@ -33,21 +39,25 @@ global{
 	
 	float ref_speed <- 10.0 #km / #h;
 	graph the_graph;
+	graph train_line_graph;
 	
-	int pollution_max_level <- 25;
+	float pollution_max_level <- 100.0;
+	int spread_factor <- 10;
 	
 
 	init{
 		create building from: shape_file_buildings with: [type::string(read ("Type"))]{
 			if type="commerce"{
-				color <- #steelblue;
-			}
-			if type="gare" or  type="Musee"{
 				color <- #goldenrod;
 			}
-			if type="habitat" {
-				//color <- #white;
-				color <- #grey;
+			if type="gare" or  type="Musee"{
+				color <- #yellow;
+			}
+			if type="habitat" or type="culte"{
+				color <- #white;
+			}
+			if type="spawn1" or type="spawn2" or type="spawn3" or type="spawn4" or type="spawn5" {
+				color <- rgb(#grey, 0.0);
 			}
 		}
 
@@ -61,22 +71,48 @@ global{
 			if classe="Autoroute"{
 				weight <- 0.2;
 			}
+			if classe="pont"{
+				weight <- 0.2;
+				color <- rgb(#grey, 0.0);
+			}
 		}
+		
+		create train_line from: shape_file_trains with: [classe::string(read("CLASSE"))]{
+		}
+		
 		map<road,float> weights_map <- road as_map (each:: (each.weight * each.shape.perimeter));
       	the_graph <- as_edge_graph(road) with_weights weights_map;
+      	
+      	map<train_line,float> weights_map_train <- train_line as_map (each:: (each.weight * each.shape.perimeter));
+      	train_line_graph <- as_edge_graph(train_line) with_weights weights_map_train;
 		
 		list<building> residential_buildings <- building where (each.type="habitat");
-      	list<building>  interesting_buildings <- building  where (each.type="commerce" or each.type="Musee" or each.type="gare") ;
-		
+      	list<building> activity_buildings <- building  where (each.type="commerce");
+      	list<building> populated_areas <- building  where (each.type="Musee" or each.type="gare");
+
 		create people number: nb_people{
 			speed <- ref_speed;
       		start_work <- min_work_start + (max_work_start - min_work_start) * rnd(0,100)/100.0;
           	end_work <- min_work_end + (max_work_end - min_work_end) * rnd(0,100)/100.0 ;
           	living_place <- one_of(residential_buildings) ;
-          	working_place <- one_of(interesting_buildings) ;
+          	working_place <- one_of(activity_buildings) ;
           	objective <- "resting";
           	location <- any_location_in (living_place);
 		}		
+		
+		
+		create extra_people_highway number: nb_extra_people{
+			spawns <- building  where (each.type="spawn1" or each.type="spawn2");
+			location <- any_location_in (one_of(spawns));
+		}
+		
+		/* TODO
+		create train number: nb_train{
+			spawns <- building  where (each.type="spawn3" or each.type="spawn4" or each.type="spawn5" or each.type="gare");
+			location <- any_location_in (one_of(spawns));
+		}
+		* 
+		*/
 	}
 	
 	reflex update_step{
@@ -94,30 +130,58 @@ global{
 		current_hour <- current_date.hour + float(current_date.minute/60.0);	
 	}
 	
+	reflex addBridges when: add_bridges_flag{
+		ask(road)
+		{
+			if(classe="pont"){
+				weight <- 0.6;
+				color <- rgb(0,255,0);
+			}
+		}
+		
+		map<road,float> weights_map <- road as_map (each:: (each.weight * each.shape.perimeter));
+		the_graph <- as_edge_graph(road) with_weights weights_map;
+		
+		add_bridges_flag <- false;
+	}
 }
 
 species building{
 	string type;
-	//rgb color <- #grey;
 	rgb color <- #black;
 	
 	aspect base {
-		draw shape color: color;
+		if(building_display){
+			draw shape color: color;
+		}
 	}
 }
 
 species road {
 	string classe;
 	float weight <- 1.0;
-	rgb color <- rgb(0, 255, 0);
+	rgb color <- rgb(0,255,0);
 	
 	aspect base {
-		draw shape color: color;
+		if(road_display){
+			draw shape color: color;
+		}
+	}
+}
+
+species train_line {
+	string classe;
+	float weight <- 0.1;
+	rgb color <- #yellow;
+	
+	aspect base {
+		if(road_display){
+			draw shape color: color;
+		}
 	}
 }
 
 species people skills: [moving]{
-	//rgb color <- #goldenrod;
 	rgb color <- #red;
 	building living_place <- nil;
 	building working_place <- nil;
@@ -154,7 +218,6 @@ species people skills: [moving]{
 	reflex update_speed{
 		speed <- ref_speed;
 	}
-
 	
 	action updatePollutionMap{
 		if(current_path != nil)
@@ -163,7 +226,7 @@ species people skills: [moving]{
 		
 			if(tmp != []){
 				ask tmp {
-					pollution_level <- pollution_level +1;
+					pollution_level <- pollution_level + 1;
 					if(pollution_level > pollution_max_level)
 					{
 						pollution_level <- pollution_max_level;
@@ -174,32 +237,119 @@ species people skills: [moving]{
 	}
 }
 
-grid cell height: 100 width: 100 neighbors: 8{
+species extra_people_highway skills: [moving]{
+	list<building> spawns;
 	
-	int pollution_level <- 0 ;
-	list neighbours of: cell <- (self neighbors_at 1) of_species cell;  
+	point the_target <- nil;
+	rgb color <- #red;
+	
+	reflex set_target when: the_target = nil and flip(0.005){
+		the_target <- any_location_in (one_of(spawns));
+	}
+	
+	reflex move when: the_target != nil{
+		do updatePollutionMap;
+		
+		path path_followed <- self goto [target::the_target, on::the_graph, return_path:: true];
+		
+		if the_target = location{
+			the_target <- nil;
+		}
+	}
+	
+	action updatePollutionMap{
+		if(current_path != nil)
+		{
+			list<cell> tmp <- cell overlapping(shape);
+		
+			if(tmp != []){
+				ask tmp {
+					pollution_level <- pollution_level + 1;
+					if(pollution_level > pollution_max_level)
+					{
+						pollution_level <- pollution_max_level;
+					}
+				}
+			}	
+		}
+	}
+	
+	aspect base{
+		if(the_target != nil ){
+			draw circle(10) color: color;
+		}
+	}
+}
+
+species train skills: [moving]{
+	list<building> spawns;
+	
+	point the_target <- nil;
+	rgb color <- #yellow;
+	
+	reflex set_target when: the_target = nil and flip(0.005){
+		the_target <- any_location_in (one_of(spawns));
+	}
+	
+	reflex move when: the_target != nil{
+		path path_followed <- self goto [target::the_target, on::train_line_graph, return_path:: true];
+		
+		if the_target = location{
+			the_target <- nil;
+		}
+	}
+	
+	
+	aspect base{
+		if(the_target != nil ){
+			draw square(40) color: color rotate: heading;
+		}
+	}
+}
+
+grid cell height: 100 width: 100 neighbors: 4 {
+	
+	float pollution_level <- 0.0 ;
+	//list neighbours of: cell <- (self neighbors_at 1) of_species cell;  
 
 	rgb pollution_color <- rgb(255,255,255);
-	float transparency <- 1.0;
+	float transparency <- 0.75;
 
 	reflex update_color when:heatmap{
-		float level2 <-(min([1,max([0,pollution_level/25])]))^(0.5);
-		float tmp <- level2*(length(heatmap_color)-1);
-		pollution_color <- rgb(heatmap_color[int(tmp)]);
+		pollution_color <-  rgb(transparency *30,transparency *109,transparency *255);
 	}
 	
 	reflex update_transparency when:heatmap {
-		transparency <- 1.0 - float(pollution_level) / pollution_max_level;
+		transparency <- float(pollution_level) / pollution_max_level;
 	}
 	
+	//TODO not working
+	/* 
+	reflex spread{
+		if(!ns_wind){
+			float tmp_pollution <- pollution_level;
+			float pollution_spread <- pollution_level * spread_factor/100.0;
+			
+			pollution_level <- pollution_level - pollution_spread;
+			pollution_spread <- pollution_spread / 8;
+			
+			loop n over: neighbours {
+				pollution_level <- pollution_level + pollution_spread;
+			}
+		}else{
+			//TODO
+		}
+	}
+	* */
+	
 	action raz {
-		pollution_level <- 0;
+		pollution_level <- 0.0;
 	}
 	
 	aspect pollution{
 		if(heatmap)
 		{
-			draw shape color:pollution_color;
+			draw shape color: rgb(pollution_color, transparency);
 		}
 	}
 }
@@ -222,10 +372,13 @@ experiment life type: gui {
 		synchronized:true 
 		camera_pos: {1473.4207,1609.8385,2114.0265} camera_look_pos: {1409.429,1572.8928,-0.883} camera_up_vector: {-0.8655,0.4997,0.0349}
 		{
-			species building aspect: base refresh: false;
-			species road aspect: base refresh: false;
-			species cell aspect:pollution transparency: 0.75;
+			species building aspect: base; // refresh: false;
+			species train_line aspect: base; 
+			species road aspect: base; 
+			species train aspect: base;
+			species extra_people_highway aspect: base;
 			species people aspect: base;
+			species cell aspect:pollution; //transparency: 0.75;
 			
 			graphics "time" {
 				draw string(current_date.hour) + "h" + string(current_date.minute) +"m" color: # white font: font("Helvetica", 30, #italic) at: {world.shape.width*0.43,world.shape.height*0.93};
@@ -233,6 +386,10 @@ experiment life type: gui {
 			
 			event ['h'] action: {heatmap <- !heatmap;}; //heatmap display
 			event ['c'] action: {if(heatmap){ask cell{do raz;}}}; // clean heatmap (if heatmap)
+			event ['b'] action: {building_display <- !building_display;}; //building display
+			event ['r'] action: {road_display <- !road_display;}; //road display
+			event ['p'] action: {add_bridges_flag <- true;}; //add bridges(ponts)
+			event ['w'] action: {ns_wind <- !ns_wind;}; //north-south wind activation
 		}
 	}
 }
