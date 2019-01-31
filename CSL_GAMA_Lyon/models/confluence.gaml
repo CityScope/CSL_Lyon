@@ -26,6 +26,7 @@ global{
 	bool building_display <- true;
 	bool add_bridges_flag <- false;
 	bool ns_wind <- false;
+	bool dynamic_background <- false;
 	
 	int nb_people <- 600;
 	int nb_extra_people <- 20;
@@ -83,9 +84,10 @@ global{
 		
 		map<road,float> weights_map <- road as_map (each:: (each.weight * each.shape.perimeter));
       	the_graph <- as_edge_graph(road) with_weights weights_map;
-      	
+      	/* 
       	map<train_line,float> weights_map_train <- train_line as_map (each:: (each.weight * each.shape.perimeter));
       	train_line_graph <- as_edge_graph(train_line) with_weights weights_map_train;
+      	* */
 		
 		list<building> residential_buildings <- building where (each.type="habitat");
       	list<building> activity_buildings <- building  where (each.type="commerce");
@@ -372,8 +374,9 @@ experiment life type: gui autorun:true{
 	
 	output{
 		display city_display type: opengl 
-		background:rgb(sin_rad(#pi * current_hour / 24.0) * 160, sin_rad(#pi * current_hour / 24.0) * 110, sin_rad(#pi * current_hour / 24.0) * 80) 
-		//background:#black 
+		background: dynamic_background?
+		rgb(sin_rad(#pi * current_hour / 24.0) * 160, sin_rad(#pi * current_hour / 24.0) * 110, sin_rad(#pi * current_hour / 24.0) * 80) 
+		:#black 
 		fullscreen:true
 		synchronized:true 
 		camera_pos: {1473.4207,1609.8385,2114.0265} camera_look_pos: {1409.429,1572.8928,-0.883} camera_up_vector: {-0.8655,0.4997,0.0349}
@@ -398,6 +401,7 @@ experiment life type: gui autorun:true{
 			event ['r'] action: {road_display <- !road_display;}; //road display
 			event ['p'] action: {add_bridges_flag <- true;}; //add bridges(ponts)
 			event ['w'] action: {ns_wind <- !ns_wind;}; //north-south wind activation
+			event ['d'] action: {dynamic_background <- !dynamic_background;}; //display dynamic background
 		}
 	}
 }
