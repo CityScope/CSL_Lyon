@@ -21,7 +21,6 @@ global{
 	float step <- step_min;
 	bool heatmap <- true;
 	bool showAgent <-true;
-	bool showRoad <-true;
 	bool heatmap_clean <- false;
 	bool road_display <- true;
 	bool building_display <- true;
@@ -372,8 +371,8 @@ experiment life type: gui autorun:true{
 	
 	output{
 		display city_display type: opengl 
-		//background:rgb(sin_rad(#pi * current_hour / 24.0) * 150, sin_rad(#pi * current_hour / 24.0) * 120, sin_rad(#pi * current_hour / 24.0) * 80) 
-		background:#black 
+		background:rgb(sin_rad(#pi * current_hour / 24.0) * 160, sin_rad(#pi * current_hour / 24.0) * 110, sin_rad(#pi * current_hour / 24.0) * 80) 
+		//background:#black 
 		fullscreen:true
 		synchronized:true 
 		camera_pos: {1473.4207,1609.8385,2114.0265} camera_look_pos: {1409.429,1572.8928,-0.883} camera_up_vector: {-0.8655,0.4997,0.0349}
@@ -391,7 +390,6 @@ experiment life type: gui autorun:true{
 				//draw string(current_date.hour) + "h" + string(current_date.minute) +"m" color: # white font: font("Helvetica", 30, #italic) at: {world.shape.width*0.43,world.shape.height*0.93};
 			}
 			
-			event ['r'] action: {showRoad <- !showRoad;}; //showRoad display
 			event ['a'] action: {showAgent <- !showAgent;}; //showRoad display
 			event ['h'] action: {heatmap <- !heatmap;}; //heatmap display
 			event ['c'] action: {if(heatmap){ask cell{do raz;}}}; // clean heatmap (if heatmap)
