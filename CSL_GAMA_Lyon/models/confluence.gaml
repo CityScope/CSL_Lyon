@@ -44,7 +44,7 @@ global{
 	graph train_line_graph;
 	
 	float pollution_max_level <- 100.0;
-	int spread_factor <- 10;
+	int spread_factor <- 1;
 	
 
 	init{
@@ -232,7 +232,7 @@ species people skills: [moving]{
 		
 			if(tmp != []){
 				ask tmp {
-					pollution_level <- pollution_level + 1;
+					pollution_level <- pollution_level + 3;
 					if(pollution_level > pollution_max_level)
 					{
 						pollution_level <- pollution_max_level;
@@ -316,7 +316,7 @@ species train skills: [moving]{
 grid cell height: 100 width: 100 neighbors: 4 {
 	
 	float pollution_level <- 0.0 ;
-	//list neighbours of: cell <- (self neighbors_at 1) of_species cell;  
+	list neighbours of: cell <- (self neighbors_at 1) of_species cell;  
 
 	rgb pollution_color <- rgb(255,255,255);
 	float transparency <- 0.75;
@@ -330,23 +330,23 @@ grid cell height: 100 width: 100 neighbors: 4 {
 	}
 	
 	//TODO not working
-	/* 
+	
 	reflex spread{
 		if(!ns_wind){
 			float tmp_pollution <- pollution_level;
 			float pollution_spread <- pollution_level * spread_factor/100.0;
 			
 			pollution_level <- pollution_level - pollution_spread;
-			pollution_spread <- pollution_spread / 8;
+			pollution_spread <- pollution_spread / 4;
 			
 			loop n over: neighbours {
-				pollution_level <- pollution_level + pollution_spread;
+				n.pollution_level <- n.pollution_level + pollution_spread;
 			}
 		}else{
 			//TODO
 		}
 	}
-	* */
+	
 	
 	action raz {
 		pollution_level <- 0.0;
