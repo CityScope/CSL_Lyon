@@ -19,6 +19,9 @@ global{
 	
 	float step <- step_min;
 	bool heatmap <- true;
+	bool showAgent <-true;
+	bool showRoad <-true;
+	bool showBuilding <-true;
 	bool heatmap_clean <- false;
 	
 	list<list<float>> heatmap_color <- [[30,146,254],[86,149,242],[144,201,254],[180,231,252],[223,255,216],[254,255,113],[248,209,69],[243,129,40],[235,46,26],[109,23,8]];
@@ -102,17 +105,23 @@ species building{
 	rgb color <- #black;
 	
 	aspect base {
-		draw shape color: color;
+		if(showBuilding){
+		  draw shape color: color;	
+		}
+		
 	}
 }
 
 species road {
 	string classe;
 	float weight <- 1.0;
-	rgb color <- rgb(0, 255, 0);
+	rgb color <- rgb(50, 50, 50);
 	
 	aspect base {
-		draw shape color: color;
+		if(showRoad){
+		  draw shape color: color;	
+		}
+		
 	}
 }
 
@@ -128,7 +137,9 @@ species people skills: [moving]{
 	point the_target <- nil;
 	
 	aspect base{
-		draw circle(10) color: color;
+		if(showAgent){
+		 draw circle(4) color: color;
+		}
 	}
 	
 	reflex time_to_work when: current_hour > start_work and current_hour < start_work + 1 and objective = "resting"{
@@ -204,7 +215,7 @@ grid cell height: 100 width: 100 neighbors: 8{
 	}
 }
 
-experiment life type: gui {
+experiment life type: gui autorun:true{
 	float minimum_cycle_duration <- 1/60; //60fps
 	
 	parameter "Car speed" var: ref_speed category: "Runtime settings" min: 5 #km/#h max: 1000 #km/#h;
@@ -218,19 +229,25 @@ experiment life type: gui {
 	
 	output{
 		display city_display type: opengl 
-		background:rgb(sin_rad(#pi * current_hour / 24.0) * 150, sin_rad(#pi * current_hour / 24.0) * 120, sin_rad(#pi * current_hour / 24.0) * 80) 
+		//background:rgb(sin_rad(#pi * current_hour / 24.0) * 150, sin_rad(#pi * current_hour / 24.0) * 120, sin_rad(#pi * current_hour / 24.0) * 80) 
+		background:#black 
+		fullscreen:true
 		synchronized:true 
 		camera_pos: {1473.4207,1609.8385,2114.0265} camera_look_pos: {1409.429,1572.8928,-0.883} camera_up_vector: {-0.8655,0.4997,0.0349}
+		keystone: [{-0.010937500000000008,0.016905071521456372,0.0},{0.0023437500000000437,1.0338101430429156,0.0},{1.0171875,1.0104031209362807,0.0},{1.015625,-0.03511053315994772,0.0}]
 		{
-			species building aspect: base refresh: false;
-			species road aspect: base refresh: false;
+			species building aspect: base refresh: true;
+			species road aspect: base refresh: true;
 			species cell aspect:pollution transparency: 0.75;
 			species people aspect: base;
 			
 			graphics "time" {
-				draw string(current_date.hour) + "h" + string(current_date.minute) +"m" color: # white font: font("Helvetica", 30, #italic) at: {world.shape.width*0.43,world.shape.height*0.93};
+				//draw string(current_date.hour) + "h" + string(current_date.minute) +"m" color: # white font: font("Helvetica", 30, #italic) at: {world.shape.width*0.43,world.shape.height*0.93};
 			}
 			
+			event ['r'] action: {showRoad <- !showRoad;}; //showRoad display
+			event ['b'] action: {showBuilding <- !showBuilding;}; //showRoad display
+			event ['a'] action: {showAgent <- !showAgent;}; //showRoad display
 			event ['h'] action: {heatmap <- !heatmap;}; //heatmap display
 			event ['c'] action: {if(heatmap){ask cell{do raz;}}}; // clean heatmap (if heatmap)
 		}
