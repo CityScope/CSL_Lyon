@@ -48,7 +48,7 @@ global{
 	
 
 	init{
-		create building from: shape_file_buildings with: [type::string(read ("Type"))]{
+		create building from: shape_file_buildings with: [type::string(read ("Type")),height::string(read ("Z"))]{
 			if type="commerce"{
 				color <- #goldenrod;
 			}
@@ -152,6 +152,7 @@ global{
 
 species building{
 	string type;
+	float height;
 	rgb color <- #black;
 	
 	aspect base {
@@ -159,12 +160,17 @@ species building{
 			draw shape color: color;
 		}
 	}
+	aspect base3D {
+		if(building_display){
+			draw shape color: color depth:height;
+		}
+	}
 }
 
 species road {
 	string classe;
 	float weight <- 1.0;
-	rgb color <- rgb(0,255,0);
+	rgb color <- rgb(125,125,150);
 	
 	aspect base {
 		if(road_display){
@@ -359,7 +365,7 @@ grid cell height: 100 width: 100 neighbors: 4 {
 	aspect pollution{
 		if(heatmap)
 		{
-			draw shape color: rgb(pollution_color, transparency);
+			draw shape color:rgb(pollution_color, transparency) border:rgb(pollution_color, transparency) empty:true;
 		}
 	}
 }
@@ -382,7 +388,53 @@ experiment life type: gui autorun:true{
 		rgb(sin_rad(#pi * current_hour / 24.0) * 160, sin_rad(#pi * current_hour / 24.0) * 110, sin_rad(#pi * current_hour / 24.0) * 80) 
 		:#black 
 		fullscreen:true
-		synchronized:true 
+		synchronized:true
+		toolbar: true 
+		{
+			species building aspect: base3D; // refresh: false;
+			species train_line aspect: base; 
+			species road aspect: base; 
+			species train aspect: base;
+			species extra_people_highway aspect: base;
+			species people aspect: base;
+			species cell aspect:pollution; //transparency: 0.75;
+			
+			graphics "time" {
+				//draw string(current_date.hour) + "h" + string(current_date.minute) +"m" color: # white font: font("Helvetica", 30, #italic) at: {world.shape.width*0.43,world.shape.height*0.93};
+			}
+			
+			event ['a'] action: {showAgent <- !showAgent;}; //showRoad display
+			event ['h'] action: {heatmap <- !heatmap;}; //heatmap display
+			event ['c'] action: {if(heatmap){ask cell{do raz;}}}; // clean heatmap (if heatmap)
+			event ['b'] action: {building_display <- !building_display;}; //building display
+			event ['r'] action: {road_display <- !road_display;}; //road display
+			event ['p'] action: {add_bridges_flag <- true;}; //add bridges(ponts)
+			event ['w'] action: {ns_wind <- !ns_wind;}; //north-south wind activation
+			event ['d'] action: {dynamic_background <- !dynamic_background;}; //display dynamic background
+		}
+	}
+}
+
+experiment lifeTable type: gui autorun:true{
+	float minimum_cycle_duration <- 1/60; //60fps
+	
+	parameter "Car speed" var: ref_speed category: "Runtime settings" min: 5 #km/#h max: 1000 #km/#h;
+	parameter "Step working/resting hour" var: step_max category: "Runtime settings" min: 1#mn max: 20#mn;
+	parameter "Step moving hour" var: step_min category: "Runtime settings";
+	
+	parameter "Number of people agents" var: nb_people category: "People";
+	
+	parameter "Shapefile for the buildings" var: shape_file_buildings category: "GIS";
+	parameter "Shapefile for the roads" var: shape_file_roads category: "GIS";
+	
+	output{
+		display city_display type: opengl 
+		background: dynamic_background?
+		rgb(sin_rad(#pi * current_hour / 24.0) * 160, sin_rad(#pi * current_hour / 24.0) * 110, sin_rad(#pi * current_hour / 24.0) * 80) 
+		:#black 
+		fullscreen:true
+		synchronized:true
+		toolbar: true 
 		camera_pos: {1473.4207,1609.8385,2114.0265} camera_look_pos: {1409.429,1572.8928,-0.883} camera_up_vector: {-0.8655,0.4997,0.0349}
 		keystone: [{-0.010937500000000008,0.016905071521456372,0.0},{0.0023437500000000437,1.0338101430429156,0.0},{1.0171875,1.0104031209362807,0.0},{1.015625,-0.03511053315994772,0.0}]
 		{
