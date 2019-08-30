@@ -1,8 +1,8 @@
 /***
-* Name: roadtraffic
-* Author: evage
-* Description: 
-* Tags: Tag1, Tag2, TagN
+* Name: CSL_Lyon 
+* Author: Arnaud Grignard et al. 2019
+* Description: CityScope Lyon about Air Quality deployed at L'Ecole de L'anthtropocène in January 2019
+* See https://youtu.be/V5sqsNWRgEI
 ***/
 
 model confluence
@@ -32,7 +32,7 @@ global{
 	int nb_extra_people <- 20;
 	int nb_train <- 5;
 	
-	float current_hour <- 0.0;
+	float current_hour <- 6.0;
 	
 	int min_work_start <- 6;
 	int max_work_start <- 8;
@@ -46,9 +46,11 @@ global{
 	float pollution_max_level <- 100.0;
 	int spread_factor <- 1;
 	
+	map<string, rgb> building_color_map <- ["RS"::#white, "RM"::rgb(125,125,125), "RL"::rgb(75,75,75), "OS"::rgb(250,226,59), "OM"::rgb(255,147,0), "OL"::rgb(215,95,0)];
+	map<string,rgb> color_per_mode <- ["car"::rgb(52,152,219), "bike"::rgb(192,57,43), "walk"::rgb(161,196,90), "pev"::#magenta];
 
 	init{
-		create building from: shape_file_buildings with: [type::string(read ("Type")),height::string(read ("Z"))]{
+		create building from: shape_file_buildings with: [type::string(read ("Type")),usage::string(read ("Usage")),scale::string(read ("Scale")),height::float(read ("Z"))]{
 			if type="commerce"{
 				color <- #goldenrod;
 			}
@@ -61,6 +63,7 @@ global{
 			if type="spawn1" or type="spawn2" or type="spawn3" or type="spawn4" or type="spawn5" {
 				color <- rgb(#grey, 0.0);
 			}
+			color <- building_color_map[usage+scale];
 		}
 
 		create road from: shape_file_roads with: [classe::string(read("CLASSE"))]{
@@ -101,6 +104,16 @@ global{
           	working_place <- one_of(activity_buildings) ;
           	objective <- "resting";
           	location <- any_location_in (living_place);
+          	if flip(0.5){
+          		  color <- color_per_mode["car"];
+          	}else{
+          		if flip(0.5){
+          		  color <- color_per_mode["bike"];	
+          		}else{
+          		  color <- color_per_mode["walk"];	
+          		}
+          	}
+          	
 		}		
 		
 		/* 
@@ -153,6 +166,8 @@ global{
 species building{
 	string type;
 	float height;
+	string usage;
+	string scale;
 	rgb color <- #black;
 	
 	aspect base {
@@ -202,6 +217,12 @@ species people skills: [moving]{
 	point the_target <- nil;
 	
 	aspect base{
+		if(showAgent){
+		 draw circle(6) color: color;
+		}
+	}
+	
+    aspect baseTable{
 		if(showAgent){
 		 draw circle(4) color: color;
 		}
@@ -368,9 +389,16 @@ grid cell height: 100 width: 100 neighbors: 4 {
 			draw shape color:rgb(pollution_color, transparency) border:rgb(pollution_color, transparency) empty:true;
 		}
 	}
+	
+	aspect pollutionFull{
+		if(heatmap)
+		{
+			draw shape color:rgb(pollution_color, transparency);
+		}
+	}
 }
 
-experiment life type: gui autorun:true{
+experiment dev type: gui autorun:true{
 	float minimum_cycle_duration <- 1/60; //60fps
 	
 	parameter "Car speed" var: ref_speed category: "Runtime settings" min: 5 #km/#h max: 1000 #km/#h;
@@ -389,18 +417,20 @@ experiment life type: gui autorun:true{
 		:#black 
 		fullscreen:true
 		synchronized:true
-		toolbar: true 
+		toolbar: false 
 		{
-			species building aspect: base3D; // refresh: false;
-			species train_line aspect: base; 
-			species road aspect: base; 
+			species building aspect: base transparency:0.5 position:{0,0,cycle/10000}; // refresh: false;
+			//species train_line aspect: base; 
+			species road aspect: base position:{0,0,cycle/12000}; 
 			species train aspect: base;
 			species extra_people_highway aspect: base;
-			species people aspect: base;
-			species cell aspect:pollution; //transparency: 0.75;
+			species people aspect: base position:{0,0,cycle/7500};
+			species cell aspect:pollution  position:{0,0,cycle/5000}; //transparency: 0.75;
 			
 			graphics "time" {
 				//draw string(current_date.hour) + "h" + string(current_date.minute) +"m" color: # white font: font("Helvetica", 30, #italic) at: {world.shape.width*0.43,world.shape.height*0.93};
+			    draw string("Air Quality") color: # white font: font("Helvetica", 30, #italic) at: {0,world.shape.height*0.9, cycle} bitmap:true;
+			
 			}
 			
 			event ['a'] action: {showAgent <- !showAgent;}; //showRoad display
@@ -412,10 +442,12 @@ experiment life type: gui autorun:true{
 			event ['w'] action: {ns_wind <- !ns_wind;}; //north-south wind activation
 			event ['d'] action: {dynamic_background <- !dynamic_background;}; //display dynamic background
 		}
+		
 	}
 }
 
-experiment lifeTable type: gui autorun:true{
+
+experiment CityScopeTable type: gui autorun:true{
 	float minimum_cycle_duration <- 1/60; //60fps
 	
 	parameter "Car speed" var: ref_speed category: "Runtime settings" min: 5 #km/#h max: 1000 #km/#h;
@@ -443,7 +475,7 @@ experiment lifeTable type: gui autorun:true{
 			species road aspect: base; 
 			species train aspect: base;
 			species extra_people_highway aspect: base;
-			species people aspect: base;
+			species people aspect: baseTable;
 			species cell aspect:pollution; //transparency: 0.75;
 			
 			graphics "time" {
