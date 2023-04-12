@@ -10,7 +10,7 @@ model confluence
 /* Insert your model definition here */
 global{
 	
-	file shape_file_buildings <- file("../includes/Bati_reclass_CC46.shp");
+	file shape_file_buildings <- file("../includes/lyon_building.shp");
 	file shape_file_roads <- file("../includes/ROUTESCC46.shp");
 	file shape_file_trains <- file("../includes/voiesferres_ligneunique_CC46.shp");
 	geometry shape <- envelope(shape_file_buildings);
@@ -50,7 +50,8 @@ global{
 	map<string,rgb> color_per_mode <- ["car"::rgb(52,152,219), "bike"::rgb(192,57,43), "walk"::rgb(161,196,90), "pev"::#magenta];
 
 	init{
-		create building from: shape_file_buildings with: [type::string(read ("Type")),usage::string(read ("Usage")),scale::string(read ("Scale")),height::float(read ("Z"))]{
+		write sample(first(shape_file_buildings).attributes);
+		create building from: shape_file_buildings with:[type::string(get("Type")),height::float(get ("Z"))]{
 			if type="commerce"{
 				color <- #goldenrod;
 			}
@@ -63,10 +64,10 @@ global{
 			if type="spawn1" or type="spawn2" or type="spawn3" or type="spawn4" or type="spawn5" {
 				color <- rgb(#grey, 0.0);
 			}
-			color <- building_color_map[usage+scale];
+			write sample(type);
 		}
 
-		create road from: shape_file_roads with: [classe::string(read("CLASSE"))]{
+		create road from: shape_file_roads with: [classe::string(get("CLASSE"))]{
 			if classe="Route"{
 				weight <- 1.0;
 			}
@@ -166,8 +167,8 @@ global{
 species building{
 	string type;
 	float height;
-	string usage;
-	string scale;
+	//string usage;
+	//string scale;
 	rgb color <- #black;
 	
 	aspect base {
@@ -410,14 +411,12 @@ experiment dev type: gui autorun:true{
 	parameter "Shapefile for the buildings" var: shape_file_buildings category: "GIS";
 	parameter "Shapefile for the roads" var: shape_file_roads category: "GIS";
 	
-	output{
+	output synchronized:true{
 		display city_display type: opengl 
 		background: dynamic_background?
 		rgb(sin_rad(#pi * current_hour / 24.0) * 160, sin_rad(#pi * current_hour / 24.0) * 110, sin_rad(#pi * current_hour / 24.0) * 80) 
 		:#black 
-		fullscreen:true
-		synchronized:true
-		toolbar: false 
+		fullscreen:true toolbar: false 
 		{
 			species building aspect: base transparency:0.5 position:{0,0,cycle/10000}; // refresh: false;
 			//species train_line aspect: base; 
@@ -433,14 +432,14 @@ experiment dev type: gui autorun:true{
 			
 			}
 			
-			event ['a'] action: {showAgent <- !showAgent;}; //showRoad display
-			event ['h'] action: {heatmap <- !heatmap;}; //heatmap display
-			event ['c'] action: {if(heatmap){ask cell{do raz;}}}; // clean heatmap (if heatmap)
-			event ['b'] action: {building_display <- !building_display;}; //building display
-			event ['r'] action: {road_display <- !road_display;}; //road display
-			event ['p'] action: {add_bridges_flag <- true;}; //add bridges(ponts)
-			event ['w'] action: {ns_wind <- !ns_wind;}; //north-south wind activation
-			event ['d'] action: {dynamic_background <- !dynamic_background;}; //display dynamic background
+			event "a" {showAgent <- !showAgent;} //showRoad display
+			event "h" {heatmap <- !heatmap;} //heatmap display
+			event "c" {if(heatmap){ask cell{do raz;}}} // clean heatmap (if heatmap)
+			event "b" {building_display <- !building_display;} //building display
+			event "r" {road_display <- !road_display;} //road display
+			event "p" {add_bridges_flag <- true;} //add bridges(ponts)
+			event "w" {ns_wind <- !ns_wind;} //north-south wind activation
+			event "d" {dynamic_background <- !dynamic_background;} //display dynamic background
 		}
 		
 	}
@@ -459,14 +458,12 @@ experiment CityScopeTable type: gui autorun:true{
 	parameter "Shapefile for the buildings" var: shape_file_buildings category: "GIS";
 	parameter "Shapefile for the roads" var: shape_file_roads category: "GIS";
 	
-	output{
+	output synchronized:true{
 		display city_display type: opengl 
 		background: dynamic_background?
 		rgb(sin_rad(#pi * current_hour / 24.0) * 160, sin_rad(#pi * current_hour / 24.0) * 110, sin_rad(#pi * current_hour / 24.0) * 80) 
 		:#black 
-		fullscreen:true
-		synchronized:true
-		toolbar: true 
+		fullscreen:true toolbar: true 
 		camera_pos: {1473.4207,1609.8385,2114.0265} camera_look_pos: {1409.429,1572.8928,-0.883} camera_up_vector: {-0.8655,0.4997,0.0349}
 		keystone: [{-0.010937500000000008,0.016905071521456372,0.0},{0.0023437500000000437,1.0338101430429156,0.0},{1.0171875,1.0104031209362807,0.0},{1.015625,-0.03511053315994772,0.0}]
 		{
@@ -482,14 +479,14 @@ experiment CityScopeTable type: gui autorun:true{
 				//draw string(current_date.hour) + "h" + string(current_date.minute) +"m" color: # white font: font("Helvetica", 30, #italic) at: {world.shape.width*0.43,world.shape.height*0.93};
 			}
 			
-			event ['a'] action: {showAgent <- !showAgent;}; //showRoad display
-			event ['h'] action: {heatmap <- !heatmap;}; //heatmap display
-			event ['c'] action: {if(heatmap){ask cell{do raz;}}}; // clean heatmap (if heatmap)
-			event ['b'] action: {building_display <- !building_display;}; //building display
-			event ['r'] action: {road_display <- !road_display;}; //road display
-			event ['p'] action: {add_bridges_flag <- true;}; //add bridges(ponts)
-			event ['w'] action: {ns_wind <- !ns_wind;}; //north-south wind activation
-			event ['d'] action: {dynamic_background <- !dynamic_background;}; //display dynamic background
+			event "a" {showAgent <- !showAgent;} //showRoad display
+			event "h" {heatmap <- !heatmap;} //heatmap display
+			event "c" {if(heatmap){ask cell{do raz;}}} // clean heatmap (if heatmap)
+			event "b" {building_display <- !building_display;} //building display
+			event "r" {road_display <- !road_display;} //road display
+			event "p" {add_bridges_flag <- true;} //add bridges(ponts)
+			event "w" {ns_wind <- !ns_wind;} //north-south wind activation
+			event "d" {dynamic_background <- !dynamic_background;} //display dynamic background
 		}
 	}
 }
